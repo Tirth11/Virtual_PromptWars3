@@ -14,7 +14,7 @@ Run** as one container.
 
 ## 🔗 Live demo
 
-**<https://carbon-platform-988953139540.us-central1.run.app>**
+**<https://virtual-prompt-wars3.vercel.app/>**
 
 > Running on Cloud Run with live Gemini (Vertex AI) insights and Firestore-backed
 > tracking in project `virtual-prompt-week-3` (`us-central1`).
