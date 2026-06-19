@@ -146,7 +146,7 @@ def _validate_gemini_response(
 
 
 @lru_cache
-def _get_gemini_client(project_id: str, region: str):
+def _get_gemini_client(project_id: str, region: str) -> "Any":
     """Return a cached Gemini client (avoids re-initializing credentials per call).
 
     Imported lazily so the SDK/credentials are only required when actually used —
