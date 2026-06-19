@@ -33,9 +33,8 @@ import time
 from functools import lru_cache
 from pathlib import Path
 
-from cachetools import TTLCache
-
 import yaml
+from cachetools import TTLCache
 
 from app.config import Settings
 from app.insights.rules import generate_rule_based_insights
@@ -146,7 +145,7 @@ def _validate_gemini_response(
 
 
 @lru_cache
-def _get_gemini_client(project_id: str, region: str) -> "Any":
+def _get_gemini_client(project_id: str, region: str) -> "typing.Any":
     """Return a cached Gemini client (avoids re-initializing credentials per call).
 
     Imported lazily so the SDK/credentials are only required when actually used —
