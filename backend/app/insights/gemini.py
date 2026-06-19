@@ -32,6 +32,8 @@ import threading
 import time
 from functools import lru_cache
 from pathlib import Path
+from typing import Any
+from collections.abc import Mapping
 
 import yaml
 from cachetools import TTLCache
@@ -53,12 +55,12 @@ _PROMPTS_DIR = Path(__file__).resolve().parent / "prompts"
 
 # TTL cache for insights responses — avoids duplicate Gemini calls when a user
 # re-submits identical data within 60 seconds.  Thread-safe via a lock.
-_INSIGHTS_CACHE: TTLCache = TTLCache(maxsize=256, ttl=60)
+_INSIGHTS_CACHE: TTLCache[str, InsightsResponse] = TTLCache(maxsize=256, ttl=60)
 _CACHE_LOCK = threading.Lock()
 
 
 @lru_cache
-def _load_prompt_config(version: str) -> dict:
+def _load_prompt_config(version: str) -> dict[str, Any]:
     """Load and cache the prompt configuration from a versioned YAML file.
 
     Falls back to the inline defaults if the file is missing, so the system
@@ -67,41 +69,51 @@ def _load_prompt_config(version: str) -> dict:
     path = _PROMPTS_DIR / f"{version}.yaml"
     if path.exists():
         with open(path, encoding="utf-8") as f:
-            return yaml.safe_load(f)
+            config = yaml.safe_load(f)
+            if config is None:
+                return {}
+            return config  # type: ignore[no-any-return]
     logger.warning("Prompt config %s not found, using inline defaults", path)
     return {}
 
 
-def _get_system_instruction(config: dict) -> str:
-    return config.get(
+def _get_system_instruction(config: Mapping[str, Any]) -> str:
+    result = config.get(
         "system_instruction",
         "You are a concise, encouraging sustainability coach. Given a person's annual "
         "carbon footprint breakdown (kg CO2e), produce a short summary and 2-4 specific, "
         "realistic actions that target their largest emission sources. Each action must "
         "include an estimated annual saving in kg CO2e. Be practical and non-judgmental.",
     )
+    if isinstance(result, str):
+        return result
+    msg = "system_instruction must be a string"
+    raise TypeError(msg)
 
 
-def _get_response_schema(config: dict) -> dict:
-    return config.get("response_schema", {
-        "type": "object",
-        "properties": {
-            "summary": {"type": "string"},
-            "recommendations": {
-                "type": "array",
-                "items": {
-                    "type": "object",
-                    "properties": {
-                        "category": {"type": "string"},
-                        "action": {"type": "string"},
-                        "estimated_annual_savings_kg": {"type": "number"},
+def _get_response_schema(config: Mapping[str, Any]) -> dict[str, Any]:
+    return config.get(
+        "response_schema",
+        {
+            "type": "object",
+            "properties": {
+                "summary": {"type": "string"},
+                "recommendations": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "category": {"type": "string"},
+                            "action": {"type": "string"},
+                            "estimated_annual_savings_kg": {"type": "number"},
+                        },
+                        "required": ["category", "action", "estimated_annual_savings_kg"],
                     },
-                    "required": ["category", "action", "estimated_annual_savings_kg"],
                 },
             },
+            "required": ["summary", "recommendations"],
         },
-        "required": ["summary", "recommendations"],
-    })
+    )
 
 
 def _build_prompt(data: CarbonInput, result: FootprintResult) -> str:
@@ -115,9 +127,7 @@ def _build_prompt(data: CarbonInput, result: FootprintResult) -> str:
     )
 
 
-def _validate_gemini_response(
-    payload: dict, total_annual_kg: float
-) -> None:
+def _validate_gemini_response(payload: Mapping[str, Any], total_annual_kg: float) -> None:
     """Validate Gemini's parsed JSON output beyond structural correctness.
 
     Raises ValueError if any recommendation has impossible savings, an unknown
@@ -145,7 +155,7 @@ def _validate_gemini_response(
 
 
 @lru_cache
-def _get_gemini_client(project_id: str, region: str) -> "typing.Any":
+def _get_gemini_client(project_id: str, region: str) -> Any:  # noqa: ANN401
     """Return a cached Gemini client (avoids re-initializing credentials per call).
 
     Imported lazily so the SDK/credentials are only required when actually used —
@@ -210,7 +220,9 @@ def _cache_key(data: CarbonInput) -> str:
 
 
 async def generate_insights(
-    data: CarbonInput, result: FootprintResult, settings: Settings,
+    data: CarbonInput,
+    result: FootprintResult,
+    settings: Settings,
     device_id: str = "",
 ) -> InsightsResponse:
     """Return personalized insights, preferring Gemini and falling back to rules.

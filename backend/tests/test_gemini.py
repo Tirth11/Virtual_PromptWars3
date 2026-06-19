@@ -45,6 +45,7 @@ async def test_disabled_gemini_uses_rules():
 @pytest.mark.asyncio
 async def test_gemini_failure_falls_back_to_rules(monkeypatch):
     gemini._INSIGHTS_CACHE.clear()
+
     def boom(*_args, **_kwargs):
         raise RuntimeError("vertex unavailable")
 
@@ -155,7 +156,11 @@ def test_validate_rejects_unknown_category():
     payload = {
         "summary": "Fine.",
         "recommendations": [
-            {"category": "crypto_mining", "action": "Stop mining", "estimated_annual_savings_kg": 100},
+            {
+                "category": "crypto_mining",
+                "action": "Stop mining",
+                "estimated_annual_savings_kg": 100,
+            },
         ],
     }
     with pytest.raises(ValueError, match="Unknown category"):
@@ -258,6 +263,7 @@ async def test_insights_cache_miss_on_different_input():
 
     # Different input (heavy meat diet).
     from app.carbon.factors import DietType
+
     data2 = CarbonInput(diet=DietType.HEAVY_MEAT)
     result2 = calculate_footprint(data2)
 
