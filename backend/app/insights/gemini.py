@@ -30,10 +30,10 @@ import json
 import logging
 import threading
 import time
+from collections.abc import Mapping
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
-from collections.abc import Mapping
 
 import yaml
 from cachetools import TTLCache
